@@ -1,0 +1,7 @@
+[package]
+name = "graphics_3d_from_scratch_pikuma"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sdl2 = { version = "0.37", features = ["bundled"] }
