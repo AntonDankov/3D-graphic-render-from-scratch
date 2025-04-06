@@ -1,15 +1,16 @@
 mod game_state;
 mod input;
 mod math;
+mod obj_importer;
 mod render;
 mod types;
 
 use std::thread;
 use std::time::Duration;
 
-use game_state::{init_box, init_game_memory};
+use game_state::{get_game_memory, init_game_memory};
 use input::process_input;
-use math::{perspective_project_entity, rotate_entity};
+use math::rotate_entity;
 use render::render;
 
 fn main() -> Result<(), String> {
@@ -32,7 +33,6 @@ fn main() -> Result<(), String> {
     let mut event_pump = sdl_context.event_pump()?;
     let mut color_buffer = vec![0u32; (width * height) as usize];
 
-    init_box();
     let ten_millis = Duration::from_millis(10);
 
     const TARGET_FPS: f64 = 144.0;
@@ -44,9 +44,13 @@ fn main() -> Result<(), String> {
 
     while (is_loop_running) {
         let frame_start = timer_subsystem.performance_counter();
+
         process_input(&mut event_pump, &mut is_loop_running);
-        update();
-        render(&mut canvas, &mut texture, &mut color_buffer, width, height);
+        if !get_game_memory().stop {
+            update();
+            render(&mut canvas, &mut texture, &mut color_buffer, width, height);
+        }
+
         let frame_end = timer_subsystem.performance_counter();
         let elapsed_ms = ((frame_end - frame_start) as f64 * 1000.0) / performance_frequency;
 
@@ -59,7 +63,7 @@ fn main() -> Result<(), String> {
         let time_elapsed = (current_time - fps_timer) as f64 / performance_frequency;
         if time_elapsed >= 1.0 {
             let fps = frame_count as f64 / time_elapsed;
-            println!("FPS: {:.2}", fps);
+            // println!("FPS: {:.2}", fps);
             frame_count = 0;
             fps_timer = current_time;
         }
@@ -69,5 +73,5 @@ fn main() -> Result<(), String> {
 pub fn update() {
     // ortographic_project_entity();
     rotate_entity();
-    perspective_project_entity();
+    // perspective_project_entity();
 }
