@@ -1,9 +1,12 @@
 mod game_state;
 mod input;
 mod math;
+mod matrix;
 mod obj_importer;
 mod render;
+mod texture;
 mod types;
+mod vector;
 
 use std::thread;
 use std::time::Duration;
@@ -35,16 +38,19 @@ fn main() -> Result<(), String> {
 
     let ten_millis = Duration::from_millis(10);
 
-    const TARGET_FPS: f64 = 144.0;
+    const TARGET_FPS: f64 = 90.0;
     const FRAME_TIME: f64 = 1000.0 / TARGET_FPS;
     let timer_subsystem = sdl_context.timer()?;
     let performance_frequency = timer_subsystem.performance_frequency() as f64;
     let mut frame_count = 0;
     let mut fps_timer = timer_subsystem.performance_counter();
-
+    let mut previous_frame_time = timer_subsystem.performance_counter();
     while (is_loop_running) {
         let frame_start = timer_subsystem.performance_counter();
 
+        get_game_memory().delta_time =
+            ((frame_start - previous_frame_time) as f64 * 1000.0 / performance_frequency) as f32;
+        previous_frame_time = frame_start;
         process_input(&mut event_pump, &mut is_loop_running);
         if !get_game_memory().stop {
             update();
@@ -63,7 +69,7 @@ fn main() -> Result<(), String> {
         let time_elapsed = (current_time - fps_timer) as f64 / performance_frequency;
         if time_elapsed >= 1.0 {
             let fps = frame_count as f64 / time_elapsed;
-            // println!("FPS: {:.2}", fps);
+            println!("FPS: {:.2}", fps);
             frame_count = 0;
             fps_timer = current_time;
         }

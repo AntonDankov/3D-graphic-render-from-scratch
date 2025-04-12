@@ -2,9 +2,13 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 
 use crate::game_state::get_game_memory;
-use crate::obj_importer::{import_entity_from_obj, open_model_path};
+use crate::math::{vector3_add, vector3_mul_float, vector3_sub};
+use crate::obj_importer::{
+    import_entity_from_obj, import_texture, open_model_path, open_texture_path,
+};
 
 pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut bool) {
+    let memory = get_game_memory();
     for event in event_pump.poll_iter() {
         match event {
             Event::Quit { .. } => *is_loop_running = false,
@@ -15,39 +19,55 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
             Event::KeyDown {
                 keycode: Some(Keycode::Up),
                 ..
-            } => get_game_memory().rotation = 0,
+            } => get_game_memory().rotation_objects_type = 0,
             Event::KeyDown {
                 keycode: Some(Keycode::Left),
                 ..
-            } => get_game_memory().rotation = 1,
+            } => get_game_memory().rotation_objects_type = 1,
             Event::KeyDown {
                 keycode: Some(Keycode::Down),
                 ..
-            } => get_game_memory().rotation = 2,
+            } => get_game_memory().rotation_objects_type = 2,
             Event::KeyDown {
                 keycode: Some(Keycode::W),
                 ..
-            } => get_game_memory().camera_position.y += 0.5,
+            } => {
+                let velocity = vector3_mul_float(memory.camera.direction, 0.05 * memory.delta_time);
+
+                get_game_memory().camera.position = vector3_add(memory.camera.position, velocity);
+            }
             Event::KeyDown {
                 keycode: Some(Keycode::S),
                 ..
-            } => get_game_memory().camera_position.y -= 0.5,
+            } => {
+                let velocity = vector3_mul_float(memory.camera.direction, 0.05 * memory.delta_time);
+
+                get_game_memory().camera.position = vector3_sub(memory.camera.position, velocity);
+            }
             Event::KeyDown {
                 keycode: Some(Keycode::A),
                 ..
-            } => get_game_memory().camera_position.x -= 0.5,
+            } => get_game_memory().camera.velocity.x -= 0.01 * memory.delta_time,
             Event::KeyDown {
                 keycode: Some(Keycode::D),
                 ..
-            } => get_game_memory().camera_position.x += 0.5,
+            } => get_game_memory().camera.velocity.x += 0.01 * memory.delta_time,
             Event::KeyDown {
                 keycode: Some(Keycode::F),
                 ..
-            } => get_game_memory().camera_position.z += 0.5,
+            } => get_game_memory().camera.position.y += 0.05 * memory.delta_time,
             Event::KeyDown {
                 keycode: Some(Keycode::G),
                 ..
-            } => get_game_memory().camera_position.z -= 0.5,
+            } => get_game_memory().camera.position.y -= 0.05 * memory.delta_time,
+            Event::KeyDown {
+                keycode: Some(Keycode::Q),
+                ..
+            } => get_game_memory().camera.rotation.y -= 0.01 * memory.delta_time,
+            Event::KeyDown {
+                keycode: Some(Keycode::E),
+                ..
+            } => get_game_memory().camera.rotation.y += 0.01 * memory.delta_time,
             Event::KeyDown {
                 keycode: Some(Keycode::B),
                 ..
@@ -55,11 +75,11 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
             Event::KeyDown {
                 keycode: Some(Keycode::N),
                 ..
-            } => get_game_memory().speed += 0.0001,
+            } => get_game_memory().speed += 0.00001,
             Event::KeyDown {
                 keycode: Some(Keycode::M),
                 ..
-            } => get_game_memory().speed -= 0.0001,
+            } => get_game_memory().speed -= 0.00001,
             Event::KeyDown {
                 keycode: Some(Keycode::Z),
                 ..
@@ -81,12 +101,19 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
                 ..
             } => get_game_memory().show_normals = !get_game_memory().show_normals,
             Event::KeyDown {
+                keycode: Some(Keycode::Num5),
+                ..
+            } => get_game_memory().use_textures = !get_game_memory().use_textures,
+            Event::KeyDown {
                 keycode: Some(Keycode::O),
                 ..
             } => {
                 if let Some(path) = open_model_path() {
                     // get_game_memory().entity = import_entity_from_obj("D:\\Coding\\Projects\\graphics_3d_from_scratch_pikuma\\assets\\f22.obj",)
                     get_game_memory().entity = import_entity_from_obj(path.to_str().unwrap_or(""));
+                }
+                if let Some(path) = open_texture_path() {
+                    get_game_memory().texture = import_texture(path.to_str().unwrap_or(""));
                 }
             }
             _ => {}
