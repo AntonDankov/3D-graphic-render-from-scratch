@@ -1,7 +1,7 @@
-use crate::game_state::{get_game_memory, BOX_POINT_COUNTER, FOV_FACTOR, HEIGHT, WIDTH};
+use crate::game_state::get_game_memory;
 use crate::matrix::{
     get_matrix4_rotation_x, get_matrix4_rotation_y, get_matrix4_rotation_z, get_matrix4_scale,
-    get_matrix4_translation, get_projection_matrix, matrix4_mul_vec4, Matrix4,
+    get_matrix4_translation, matrix4_mul_vec4, Matrix4,
 };
 use crate::types::{IntVec2, TextureUV, Vec2, Vec3};
 use crate::vector::Vec4;
@@ -81,7 +81,13 @@ pub fn barycentric_weights(a: IntVec2, b: IntVec2, c: IntVec2, p: IntVec2) -> Ve
     }
 }
 
-pub fn transform_vertex(vert: Vec3, rotation: Vec3, scale: Vec3, translation: Vec3) -> Vec3 {
+pub fn transform_vertex(
+    vert: Vec3,
+    rotation: Vec3,
+    scale: Vec3,
+    translation: Vec3,
+    view_matrix: Matrix4,
+) -> Vec3 {
     let mut vec4: Vec4 = vert.into();
     vec4 = matrix4_mul_vec4(get_matrix4_scale(scale.x, scale.y, scale.z), vec4);
     vec4 = matrix4_mul_vec4(get_matrix4_rotation_x(rotation.x), vec4);
@@ -93,7 +99,9 @@ pub fn transform_vertex(vert: Vec3, rotation: Vec3, scale: Vec3, translation: Ve
         vec4,
     );
 
-    let mut res: Vec3 = vec4.into();
+    vec4 = matrix4_mul_vec4(view_matrix, vec4);
+
+    let res: Vec3 = vec4.into();
     // res.z += 5.0;
     res
 }
@@ -109,15 +117,15 @@ pub fn transform_vertex(vert: Vec3, rotation: Vec3, scale: Vec3, translation: Ve
 pub fn rotate_entity() {
     let memory = get_game_memory();
     for i in 0..memory.entity.mesh.vertices.len() {
-        if (memory.rotation_objects_type == 0) {
+        if memory.rotation_objects_type == 0 {
             memory.entity.rotation.x += memory.speed * memory.delta_time;
             // memory.entity.scale.x += memory.speed;
             // memory.entity.translation.x += memory.speed;
-        } else if (memory.rotation_objects_type == 1) {
+        } else if memory.rotation_objects_type == 1 {
             memory.entity.rotation.y += memory.speed * memory.delta_time;
             // memory.entity.scale.y += memory.speed;
             // memory.entity.translation.y += memory.speed;
-        } else if (memory.rotation_objects_type == 2) {
+        } else if memory.rotation_objects_type == 2 {
             memory.entity.rotation.z += memory.speed * memory.delta_time;
             // memory.entity.scale.z += memory.speed;
             // memory.entity.translation.z = 5.0;
@@ -298,6 +306,15 @@ pub fn vector3_mul_float(a: Vec3, b: f32) -> Vec3 {
     };
     res
 }
+
+pub fn vector2_mul_float(a: Vec2, b: f32) -> Vec2 {
+    let res = Vec2 {
+        x: a.x * b,
+        y: a.y * b,
+    };
+    res
+}
+
 pub fn vector2_mul(a: Vec2, b: Vec2) -> Vec2 {
     let res = Vec2 {
         x: a.x * b.x,

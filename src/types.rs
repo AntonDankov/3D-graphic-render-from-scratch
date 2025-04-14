@@ -70,8 +70,8 @@ pub struct Camera {
 }
 
 pub struct Plane {
-    position: Vec3,
-    normal_dirrection: Vec3,
+    pub position: Vec3,
+    pub normal_dirrection: Vec3,
 }
 
 pub struct CullinSettings {
@@ -95,7 +95,7 @@ pub struct Memory {
     pub use_textures: bool,
     pub draw_vert: bool,
     pub draw_edges: bool,
-    pub fov: f32,
+    pub fov: Vec2,
     pub light: Vec3,
     pub texture: Texture,
     pub z_buffer: Vec<f32>,
@@ -114,6 +114,18 @@ pub struct TextureUV {
 impl Default for TextureUV {
     fn default() -> Self {
         Self { u: 0.0, v: 0.0 }
+    }
+}
+
+impl From<TextureUV> for Vec2 {
+    fn from(v: TextureUV) -> Self {
+        Vec2 { x: v.u, y: v.v }
+    }
+}
+
+impl From<Vec2> for TextureUV {
+    fn from(v: Vec2) -> Self {
+        TextureUV { u: v.x, v: v.y }
     }
 }
 

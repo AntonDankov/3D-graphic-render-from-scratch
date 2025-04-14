@@ -32,7 +32,7 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
                 keycode: Some(Keycode::W),
                 ..
             } => {
-                let velocity = vector3_mul_float(memory.camera.direction, 0.05 * memory.delta_time);
+                let velocity = vector3_mul_float(memory.camera.direction, 0.05);
 
                 get_game_memory().camera.position = vector3_add(memory.camera.position, velocity);
             }
@@ -40,34 +40,34 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
                 keycode: Some(Keycode::S),
                 ..
             } => {
-                let velocity = vector3_mul_float(memory.camera.direction, 0.05 * memory.delta_time);
+                let velocity = vector3_mul_float(memory.camera.direction, 0.05);
 
                 get_game_memory().camera.position = vector3_sub(memory.camera.position, velocity);
             }
             Event::KeyDown {
                 keycode: Some(Keycode::A),
                 ..
-            } => get_game_memory().camera.velocity.x -= 0.01 * memory.delta_time,
+            } => get_game_memory().camera.velocity.x -= 0.01,
             Event::KeyDown {
                 keycode: Some(Keycode::D),
                 ..
-            } => get_game_memory().camera.velocity.x += 0.01 * memory.delta_time,
+            } => get_game_memory().camera.velocity.x += 0.01,
             Event::KeyDown {
                 keycode: Some(Keycode::F),
                 ..
-            } => get_game_memory().camera.position.y += 0.05 * memory.delta_time,
+            } => get_game_memory().camera.position.y += 0.05,
             Event::KeyDown {
                 keycode: Some(Keycode::G),
                 ..
-            } => get_game_memory().camera.position.y -= 0.05 * memory.delta_time,
+            } => get_game_memory().camera.position.y -= 0.05,
             Event::KeyDown {
                 keycode: Some(Keycode::Q),
                 ..
-            } => get_game_memory().camera.rotation.y -= 0.01 * memory.delta_time,
+            } => get_game_memory().camera.rotation.y -= 0.01,
             Event::KeyDown {
                 keycode: Some(Keycode::E),
                 ..
-            } => get_game_memory().camera.rotation.y += 0.01 * memory.delta_time,
+            } => get_game_memory().camera.rotation.y += 0.01,
             Event::KeyDown {
                 keycode: Some(Keycode::B),
                 ..

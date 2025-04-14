@@ -1,24 +1,16 @@
-use crate::texture::REDBRICK_TEXTURE;
-use crate::types::{Camera, Entity, IntVec2, Texture, TextureUV, Vec2, Vec3};
+use crate::types::{Camera, Entity, IntVec2, Plane, Texture, TextureUV, Vec2, Vec3};
 use crate::vector::Vec4;
-use sdl2::pixels::Color;
-use sdl2::render::Texture as SdlTexture;
-use sdl2::video::Window;
 use std::cmp;
-use std::num;
 use std::thread;
 
-use crate::game_state::{get_color_buffer, get_game_memory, BOX_POINT_COUNTER, HEIGHT, WIDTH};
+use crate::game_state::{get_color_buffer, get_game_memory, HEIGHT, WIDTH};
 use crate::math::{
     barycentric_weights, get_inv_slope, light_apply_intensity, perspective_project_point,
     transform_vertex, triangle_avg, triangle_midpoint_uv, triangle_vec2_midpoint,
-    triangle_vec4_midpoint, vector3_add, vector3_cross, vector3_dot, vector3_mul,
-    vector3_normalize, vector3_sub,
+    triangle_vec4_midpoint, vector2_add, vector2_mul_float, vector2_sub, vector3_add,
+    vector3_cross, vector3_dot, vector3_mul, vector3_mul_float, vector3_normalize, vector3_sub,
 };
-use crate::matrix::{
-    get_fps_view_matrix, get_look_at_view_matrix, get_projection_matrix, matrix4_mul_matrix4,
-    Matrix4,
-};
+use crate::matrix::{get_fps_view_matrix, get_projection_matrix, matrix4_mul_matrix4, Matrix4};
 
 pub fn render_entity(entity: &Entity, camera: &mut Camera) {
     let line_color = 0xFF00FF00;
@@ -30,7 +22,7 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
     // );
 
     let mut projection_matrix =
-        get_projection_matrix(game_memory.fov, HEIGHT as f32 / WIDTH as f32);
+        get_projection_matrix(game_memory.fov.y, HEIGHT as f32 / WIDTH as f32);
     /*  Look-At method of view with locking on the target
     let view_matrix = get_look_at_view_matrix(
         camera.position,
@@ -45,8 +37,9 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
             z: 0.0,
         },
     ); */
+    // dbg!("loop render");
     let view_matrix = get_fps_view_matrix(&mut game_memory.camera);
-    projection_matrix = matrix4_mul_matrix4(projection_matrix, view_matrix);
+    // projection_matrix = matrix4_mul_matrix4(projection_matrix, view_matrix);
     for (i, triangle) in entity.mesh.triangles.iter().enumerate() {
         // dbg!(i);
         let x_index = (triangle.a as usize) - 1;
@@ -57,18 +50,21 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
             entity.rotation,
             entity.scale,
             entity.translation,
+            view_matrix,
         );
         let p1 = transform_vertex(
             entity.mesh.vertices[y_index],
             entity.rotation,
             entity.scale,
             entity.translation,
+            view_matrix,
         );
         let p2 = transform_vertex(
             entity.mesh.vertices[z_index],
             entity.rotation,
             entity.scale,
             entity.translation,
+            view_matrix,
         );
 
         let vector_ab = vector3_sub(p1, p0);
@@ -76,76 +72,195 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
         let mut normal = vector3_cross(vector_ab, vector_ac);
         vector3_normalize(&mut normal);
 
-        let camera_ray = vector3_sub(camera.position, p0);
+        let camera_ray = vector3_sub(Vec3::default(), p0);
         let dot = vector3_dot(normal, camera_ray);
 
-        if (dot < 0.0) {
+        if dot < 0.0 {
             continue;
         }
-        let mut normal_avg = triangle_avg(p0, p1, p2);
+        let normal_avg = triangle_avg(p0, p1, p2);
 
-        let projected0 =
-            perspective_project_point(p0, camera.position, projection_matrix, HEIGHT, WIDTH);
-        let projected1 =
-            perspective_project_point(p1, camera.position, projection_matrix, HEIGHT, WIDTH);
-        let projected2 =
-            perspective_project_point(p2, camera.position, projection_matrix, HEIGHT, WIDTH);
-        // let p = IntVec2 {
-        //     x: ((projected0.x + projected1.x) / 2.0) as i32,
-        //     y: ((projected2.y + projected1.y) / 2.0) as i32,
-        // };
-        // dbg!(p.x, p.y);
-        // dbg!(p0.x, p0.y, p0.z, projected0.x, projected0.y);
-        // dbg!(p1.x, p1.y, p1.z, projected1.x, projected1.y);
-        // dbg!(p2.x, p2.y, p2.z, projected2.x, projected2.y);
-        // let bar_res =
-        //     barycentric_weights(projected0.into(), projected1.into(), projected2.into(), p);
-        // dbg!(bar_res.x, bar_res.y, bar_res.z);
+        let (clipped_triangles, clipped_triangle_uvs) = clip_triangle(
+            &game_memory.culling_settings.planes,
+            p0,
+            p1,
+            p2,
+            triangle.a_uv,
+            triangle.b_uv,
+            triangle.c_uv,
+        );
+        for j in 0..clipped_triangles.len() {
+            let clipped_triangle = &clipped_triangles[j];
 
-        if get_game_memory().fill_triangles {
-            let light_dot = vector3_dot(game_memory.light, normal) * -1.0;
-            let color_by_light = light_apply_intensity(0xFF184787, light_dot);
-            if (game_memory.use_textures) {
-                let texture_uv0 = triangle.a_uv.clone();
-                let texture_uv1 = triangle.b_uv.clone();
-                let texture_uv2 = triangle.c_uv.clone();
+            let clipped_triangle_uv = &clipped_triangle_uvs[j];
+            let projected0 = perspective_project_point(
+                clipped_triangle[0],
+                // p0,
+                camera.position,
+                projection_matrix,
+                HEIGHT,
+                WIDTH,
+            );
+            let projected1 = perspective_project_point(
+                clipped_triangle[1],
+                // p1,
+                camera.position,
+                projection_matrix,
+                HEIGHT,
+                WIDTH,
+            );
+            let projected2 = perspective_project_point(
+                clipped_triangle[2],
+                // p2,
+                camera.position,
+                projection_matrix,
+                HEIGHT,
+                WIDTH,
+            );
 
-                fill_triangle_with_texture(
-                    projected0,
-                    projected1,
-                    projected2,
-                    texture_uv0,
-                    texture_uv1,
-                    texture_uv2,
-                    &game_memory.texture,
-                );
-            } else {
-                fill_triangle(
+            if get_game_memory().fill_triangles {
+                let light_dot = vector3_dot(game_memory.light, normal) * -1.0;
+                let color_by_light = light_apply_intensity(0xFF184787, light_dot);
+                if game_memory.use_textures {
+                    let texture_uv0 = clipped_triangle_uv[0].clone();
+                    let texture_uv1 = clipped_triangle_uv[1].clone();
+                    let texture_uv2 = clipped_triangle_uv[2].clone();
+
+                    fill_triangle_with_texture(
+                        projected0,
+                        projected1,
+                        projected2,
+                        texture_uv0,
+                        texture_uv1,
+                        texture_uv2,
+                        &game_memory.texture,
+                    );
+                } else {
+                    fill_triangle(
+                        projected0.into(),
+                        projected1.into(),
+                        projected2.into(),
+                        color_by_light,
+                    );
+                }
+            }
+
+            if game_memory.draw_edges {
+                render_edges(
                     projected0.into(),
                     projected1.into(),
                     projected2.into(),
-                    color_by_light,
+                    line_color,
                 );
             }
-        }
 
-        if game_memory.draw_edges {
-            render_edges(
-                projected0.into(),
-                projected1.into(),
-                projected2.into(),
-                line_color,
-            );
-        }
+            if game_memory.draw_vert {
+                render_verticies(projected0.into(), projected1.into(), projected2.into());
+            }
 
-        if game_memory.draw_vert {
-            render_verticies(projected0.into(), projected1.into(), projected2.into());
-        }
-
-        if game_memory.show_normals {
-            render_normals(normal, normal_avg, camera.position, projection_matrix);
+            if game_memory.show_normals {
+                render_normals(normal, normal_avg, camera.position, projection_matrix);
+            }
         }
     }
+}
+
+pub fn clip_triangle(
+    planes: &Vec<Plane>,
+    point0: Vec3,
+    point1: Vec3,
+    point2: Vec3,
+    point0_uv: TextureUV,
+    point1_uv: TextureUV,
+    point2_uv: TextureUV,
+) -> (Vec<Vec<Vec3>>, Vec<Vec<TextureUV>>) {
+    let mut polygon_points: Vec<Vec3> = vec![];
+    let mut polygon_uvs: Vec<TextureUV> = vec![];
+    polygon_points.push(point0);
+    polygon_points.push(point1);
+    polygon_points.push(point2);
+
+    polygon_uvs.push(point0_uv);
+    polygon_uvs.push(point1_uv);
+    polygon_uvs.push(point2_uv);
+
+    for plane in planes {
+        (polygon_points, polygon_uvs) = clip_polygon(&plane, &polygon_points, &polygon_uvs);
+    }
+    let mut triangles: Vec<Vec<Vec3>> = vec![];
+    let mut trinagles_uv: Vec<Vec<TextureUV>> = vec![];
+    if polygon_points.len() < 3 {
+        return (triangles, trinagles_uv);
+    }
+    let mut i = 2;
+    loop {
+        let mut triangle: Vec<Vec3> = vec![];
+        triangle.push(polygon_points[0]);
+        triangle.push(polygon_points[i - 1]);
+        triangle.push(polygon_points[i]);
+        triangles.push(triangle);
+
+        let mut triangle_uv: Vec<TextureUV> = vec![];
+        triangle_uv.push(polygon_uvs[0]);
+        triangle_uv.push(polygon_uvs[i - 1]);
+        triangle_uv.push(polygon_uvs[i]);
+
+        trinagles_uv.push(triangle_uv);
+
+        i += 1;
+        if (i >= polygon_points.len()) {
+            break;
+        }
+    }
+    (triangles, trinagles_uv)
+}
+
+pub fn clip_polygon(
+    plane: &Plane,
+    polygon_points: &Vec<Vec3>,
+    polygon_uvs: &Vec<TextureUV>,
+) -> (Vec<Vec3>, Vec<TextureUV>) {
+    let mut inside_points: Vec<Vec3> = vec![];
+
+    let mut inside_uvs: Vec<TextureUV> = vec![];
+    if polygon_points.len() == 0 {
+        return (inside_points, inside_uvs);
+    }
+    let mut prev_point = polygon_points.last().unwrap().clone();
+    let mut prev_uv = polygon_uvs.last().unwrap().clone();
+    let prev_point_vec = vector3_sub(prev_point, plane.position);
+    let mut previous_dot = vector3_dot(prev_point_vec, plane.normal_dirrection);
+    for i in 0..polygon_points.len() {
+        let point = polygon_points[i];
+        let uv = polygon_uvs[i];
+        let sp = vector3_sub(point, plane.position);
+        let dot = vector3_dot(sp, plane.normal_dirrection);
+        // dbg!(dot, previous_dot);
+        if (dot * previous_dot < 0.0) {
+            let t = (previous_dot) / (previous_dot - dot);
+            let intersect_point = vector3_add(
+                prev_point,
+                vector3_mul_float(vector3_sub(point, prev_point), t),
+            );
+            let intersect_uv = vector2_add(
+                prev_uv.into(),
+                vector2_mul_float(vector2_sub(uv.into(), prev_uv.into()), t),
+            )
+            .into();
+            // dbg!("new clip point");
+            inside_points.push(intersect_point);
+            inside_uvs.push(intersect_uv);
+        }
+
+        if (dot > 0.0) {
+            inside_points.push(point);
+            inside_uvs.push(uv);
+        }
+        prev_point = point.clone();
+        prev_uv = uv.clone();
+        previous_dot = dot.clone();
+    }
+    (inside_points, inside_uvs)
 }
 
 pub fn render_verticies(p0: Vec2, p1: Vec2, p2: Vec2) {
@@ -208,12 +323,12 @@ pub fn render_line(x_start: i32, y_start: i32, x_end: i32, y_end: i32, color: u3
     let width_i32 = WIDTH as i32;
     let height_i32 = HEIGHT as i32;
 
-    let mut x_start_cheched = x_start;
+    let x_start_cheched = x_start;
 
-    let mut x_end_cheched = x_end;
-    let mut y_start_cheched = y_start;
+    let x_end_cheched = x_end;
+    let y_start_cheched = y_start;
 
-    let mut y_end_cheched = y_end;
+    let y_end_cheched = y_end;
 
     let dx = x_end_cheched - x_start_cheched;
     let dy = y_end_cheched - y_start_cheched;
@@ -261,7 +376,7 @@ pub fn fill_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u32) {
     let mut mid_point = p1;
     let mut bottom_point = p2;
 
-    if (bottom_point.y < mid_point.y) {
+    if bottom_point.y < mid_point.y {
         std::mem::swap(&mut bottom_point, &mut mid_point);
     }
     if mid_point.y < top_point.y {
@@ -285,7 +400,7 @@ pub fn fill_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u32) {
 pub fn fill_flat_bottom_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u32) {
     let mut left_point = p1;
     let mut right_point = p2;
-    if (left_point.x > right_point.x) {
+    if left_point.x > right_point.x {
         std::mem::swap(&mut left_point, &mut right_point);
     }
 
@@ -299,8 +414,6 @@ pub fn fill_flat_bottom_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u
 
     let y_start = p0.y;
     let y_end = p2.y + 1;
-    // dbg!(p0.x, p0.y, p1.x, p1.y, p2.x, p2.y);
-    // dbg!(y_start, y_end, left_slope, right_slope, x_start, x_end);
     for y in y_start..y_end {
         render_line(x_start as i32, y, x_end as i32, y, color);
         x_start += left_slope;
@@ -315,7 +428,7 @@ pub fn fill_flat_bottom_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u
 pub fn fill_flat_top_triangle(p0: IntVec2, p1: IntVec2, p2: IntVec2, color: u32) {
     let mut left_point = p1;
     let mut right_point = p2;
-    if (left_point.x > right_point.x) {
+    if left_point.x > right_point.x {
         std::mem::swap(&mut left_point, &mut right_point);
     }
 
@@ -360,7 +473,7 @@ pub fn fill_triangle_with_texture(
     let mut bottom_point = p2;
     let mut bottom_point_texture = texture_uv2;
 
-    if (top_point.y > mid_point.y) {
+    if top_point.y > mid_point.y {
         std::mem::swap(&mut top_point, &mut mid_point);
         std::mem::swap(&mut top_point_texture, &mut mid_point_texture);
     }
@@ -372,70 +485,6 @@ pub fn fill_triangle_with_texture(
         std::mem::swap(&mut top_point, &mut mid_point);
         std::mem::swap(&mut top_point_texture, &mut mid_point_texture);
     }
-
-    // let mut inv_slope_1 = 0.0;
-    // let mut inv_slope_2 = 0.0;
-    // if mid_point.y - top_point.y != 0 {
-    //     inv_slope_1 =
-    //         ((mid_point.x - top_point.x) as f32 / (mid_point.y - top_point.y).abs() as f32);
-    // }
-    // if bottom_point.y - top_point.y != 0 {
-    //     inv_slope_2 =
-    //         (bottom_point.x - top_point.x) as f32 / (bottom_point.y - top_point.y).abs() as f32;
-    // }
-    // if mid_point.y - top_point.y != 0 {
-    //     for y in top_point.y..mid_point.y + 1 {
-    //         let mut x_start = mid_point.x + ((y - mid_point.y) as f32 * inv_slope_1) as i32;
-    //         let mut x_end = top_point.x + ((y - top_point.y) as f32 * inv_slope_2) as i32;
-    //         if (x_start > x_end) {
-    //             std::mem::swap(&mut x_start, &mut x_end);
-    //         }
-    //         for x in x_start..x_end + 1 {
-    //             render_texel(
-    //                 IntVec2 { x: x, y: y },
-    //                 top_point,
-    //                 mid_point,
-    //                 bottom_point,
-    //                 top_point_texture,
-    //                 mid_point_texture,
-    //                 bottom_point_texture,
-    //                 texture,
-    //             );
-    //         }
-    //     }
-    // }
-    //
-    // inv_slope_1 = 0.0;
-    // inv_slope_2 = 0.0;
-    // if bottom_point.y - mid_point.y != 0 {
-    //     inv_slope_1 =
-    //         ((bottom_point.x - mid_point.x) as f32 / (bottom_point.y - mid_point.y).abs() as f32);
-    // }
-    // if bottom_point.y - top_point.y != 0 {
-    //     inv_slope_2 =
-    //         (bottom_point.x - top_point.x) as f32 / (bottom_point.y - top_point.y).abs() as f32;
-    // }
-    // if bottom_point.y - mid_point.y != 0 {
-    //     for y in mid_point.y + 1..bottom_point.y + 1 {
-    //         let mut x_start = mid_point.x + ((y - mid_point.y) as f32 * inv_slope_1) as i32;
-    //         let mut x_end = top_point.x + ((y - top_point.y) as f32 * inv_slope_2) as i32;
-    //         if (x_start > x_end) {
-    //             std::mem::swap(&mut x_start, &mut x_end);
-    //         }
-    //         for x in x_start..x_end + 1 {
-    //             render_texel(
-    //                 IntVec2 { x: x, y: y },
-    //                 top_point,
-    //                 mid_point,
-    //                 bottom_point,
-    //                 top_point_texture,
-    //                 mid_point_texture,
-    //                 bottom_point_texture,
-    //                 texture,
-    //             );
-    //         }
-    //     }
-    // }
 
     if mid_point.y == bottom_point.y {
         fill_flat_bottom_triangle_with_texture(
@@ -501,7 +550,7 @@ pub fn fill_flat_bottom_triangle_with_texture(
     let mut left_point_uv = texture_uv1;
     let mut right_point = p2;
     let mut right_point_uv = texture_uv2;
-    if (left_point.x > right_point.x) {
+    if left_point.x > right_point.x {
         std::mem::swap(&mut left_point, &mut right_point);
         std::mem::swap(&mut left_point_uv, &mut right_point_uv);
     }
@@ -561,33 +610,22 @@ pub fn render_texel(
     let interpolated_v = uv0.v / p0.w * alpha + uv1.v / p1.w * beta + uv2.v / p2.w * gamma;
     let interpolated_reciprocal_w =
         (1.0 / p0.w) * alpha + (1.0 / p1.w) * beta + (1.0 / p2.w) * gamma;
-    // dbg!(
-    //     alpha,
-    //     beta,
-    //     gamma,
-    //     uv0.u,
-    //     uv1.u,
-    //     uv2.u,
-    //     interpolated_u,
-    //     interpolated_v
-    // );
+
     let texture_x_coord =
         ((interpolated_u / interpolated_reciprocal_w) * texture.width as f32).abs() as u32;
     let texture_y_coord =
         ((interpolated_v / interpolated_reciprocal_w) * texture.height as f32).abs() as u32;
 
-    let mut index = (texture_y_coord * texture.width + texture_x_coord) as usize
+    let index = (texture_y_coord * texture.width + texture_x_coord) as usize
         % (texture.width * texture.height) as usize;
-    // if (index >= 4096) {
-    // index = 4095;
-    // }
+
     let w = 1.0 - interpolated_reciprocal_w;
     let pixel_index = (p.y as u32 * WIDTH + p.x as u32) as usize;
-    if get_game_memory().z_buffer[pixel_index] > w {
+    if pixel_index < get_game_memory().z_buffer.len() && get_game_memory().z_buffer[pixel_index] > w
+    {
         get_game_memory().z_buffer[pixel_index] = w;
         render_pixel(p.x, p.y, texture.data[index]);
     }
-    // render_pixel(p.x, p.y, index as u32);
 }
 
 pub fn fill_flat_top_triangle_with_texture(
@@ -603,7 +641,7 @@ pub fn fill_flat_top_triangle_with_texture(
     let mut left_point_uv = texture_uv1;
     let mut right_point = p2;
     let mut right_point_uv = texture_uv2;
-    if (left_point.x > right_point.x) {
+    if left_point.x > right_point.x {
         std::mem::swap(&mut left_point, &mut right_point);
         std::mem::swap(&mut left_point_uv, &mut right_point_uv);
     }
@@ -648,7 +686,7 @@ pub fn render_pixel(x_pos: i32, y_pos: i32, color: u32) {
     let color_buffer = get_color_buffer();
     let width_i32 = WIDTH as i32;
     let height_i32 = HEIGHT as i32;
-    if (x_pos < width_i32 && x_pos >= 0 && y_pos >= 0 && y_pos < height_i32) {
+    if x_pos < width_i32 && x_pos >= 0 && y_pos >= 0 && y_pos < height_i32 {
         color_buffer[(y_pos * width_i32 + x_pos) as usize] = color;
     }
 }

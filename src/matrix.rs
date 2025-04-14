@@ -128,7 +128,7 @@ pub fn get_fps_view_matrix(camera: &mut Camera) -> Matrix4 {
         z: 1.0,
     };
     // vector3_add(target, camera.velocity);
-    let mut y_rotation_matrix = get_matrix4_rotation_y(camera.rotation.y);
+    let y_rotation_matrix = get_matrix4_rotation_y(camera.rotation.y);
     camera.direction = matrix4_mul_vec4(y_rotation_matrix, target.into()).into();
     camera.position = vector3_add(
         camera.position,
@@ -136,7 +136,7 @@ pub fn get_fps_view_matrix(camera: &mut Camera) -> Matrix4 {
     );
     target = vector3_add(camera.direction, camera.position);
 
-    let mut view_matrix = get_look_at_view_matrix(
+    let view_matrix = get_look_at_view_matrix(
         camera.position,
         target,
         Vec3 {
@@ -173,10 +173,10 @@ pub fn get_look_at_view_matrix(camera_pos: Vec3, target: Vec3, up_view: Vec3) ->
 pub fn get_projection_matrix(fov: f32, aspect_ratio: f32) -> Matrix4 {
     // let f = (1.0 as f64 / ((fov as f32 / 2.0).tan()) as f64) as f32;
     let f = 1.73205078;
-    let ff = ((fov as f32 / 2.0).tan());
+    let ff = (fov as f32 / 2.0).tan();
     let z_far = 100.0;
     let z_near = 0.1;
-    let z_normalizer_left = (z_far / (z_far - z_near));
+    let z_normalizer_left = z_far / (z_far - z_near);
     let z_normalizer_right = -(z_far / (z_far - z_near) * z_near);
     let res = Matrix4 {
         m: [

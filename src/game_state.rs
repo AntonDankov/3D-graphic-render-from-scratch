@@ -1,10 +1,8 @@
-use crate::obj_importer::import_entity_from_obj;
 use crate::texture::REDBRICK_TEXTURE;
 use crate::types::{
-    get_vec3_identity, Camera, CullinSettings, Entity, IntVec3, Memory, Mesh, Plane, Texture,
-    TextureUV, Triangle, Vec2, Vec3,
+    get_vec3_identity, Camera, CullinSettings, Entity, Memory, Mesh, Plane, Texture, TextureUV,
+    Triangle, Vec2, Vec3,
 };
-use std::f32::consts::PI;
 
 pub static FOV_FACTOR: f32 = 640.0;
 pub static BOX_POINT_COUNTER: usize = 9 * 9 * 9;
@@ -19,6 +17,14 @@ pub fn init_game_memory() {
             .chunks_exact(4)
             .map(|chunk| u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
+        let z_near = 0.01;
+        let z_far = 100.0;
+        let fov_y: f32 = 3.14159265358979323846264338327950288 / 3.0;
+        let aspect_ration_x: f32 = WIDTH as f32 / HEIGHT as f32;
+        let fov = Vec2 {
+            x: ((fov_y / 2.0).tan() * aspect_ration_x).atan() * 2.0,
+            y: fov_y,
+        };
         GAME_MEMORY = Some(Memory {
             delta_time: 0.0,
             color_buffer: vec![0; (WIDTH * HEIGHT) as usize],
@@ -44,8 +50,8 @@ pub fn init_game_memory() {
             fill_triangles: true,
             draw_vert: true,
             draw_edges: true,
-            use_textures: true,
-            fov: 3.14159265358979323846264338327950288 / 3.0,
+            use_textures: false,
+            fov: fov,
             light: Vec3 {
                 x: 0.0,
                 y: 0.0,
@@ -58,9 +64,9 @@ pub fn init_game_memory() {
             },
             z_buffer: vec![1.0; (WIDTH * HEIGHT) as usize],
             culling_settings: CullinSettings {
-                planes: vec![],
-                z_near: 0.01,
-                z_far: 100.0,
+                planes: generate_culling_planes(fov, z_near, z_far),
+                z_near: z_near,
+                z_far: z_far,
             },
         });
     }
@@ -70,8 +76,76 @@ pub fn get_game_memory() -> &'static mut Memory {
     unsafe { GAME_MEMORY.as_mut().unwrap() }
 }
 
-pub fn generate_culling_planes(z_near: f32, z_far: f32) {
-    let planes: Vec<Plane> = vec![];
+pub fn generate_culling_planes(fov: Vec2, z_near: f32, z_far: f32) -> Vec<Plane> {
+    let mut planes: Vec<Plane> = vec![];
+    let cos_half_fov_x = (fov.x / 2.0).cos();
+    let sin_half_fov_x = (fov.x / 2.0).sin();
+    let cos_half_fov_y = (fov.y / 2.0).cos();
+    let sin_half_fov_y = (fov.y / 2.0).sin();
+
+    let left_plane = Plane {
+        position: Vec3::default(),
+        normal_dirrection: Vec3 {
+            x: cos_half_fov_x,
+            y: 0.0,
+            z: sin_half_fov_x,
+        },
+    };
+    planes.push(left_plane);
+    let right_plane = Plane {
+        position: Vec3::default(),
+        normal_dirrection: Vec3 {
+            x: -cos_half_fov_x,
+            y: 0.0,
+            z: sin_half_fov_x,
+        },
+    };
+    planes.push(right_plane);
+    let top_plane = Plane {
+        position: Vec3::default(),
+        normal_dirrection: Vec3 {
+            x: 0.0,
+            y: -cos_half_fov_y,
+            z: sin_half_fov_y,
+        },
+    };
+    planes.push(top_plane);
+    let bottom_plane = Plane {
+        position: Vec3::default(),
+        normal_dirrection: Vec3 {
+            x: 0.0,
+            y: cos_half_fov_y,
+            z: sin_half_fov_y,
+        },
+    };
+    planes.push(bottom_plane);
+    let near_plane = Plane {
+        position: Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: z_near,
+        },
+        normal_dirrection: Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: 1.0,
+        },
+    };
+    planes.push(near_plane);
+    let far_plane = Plane {
+        position: Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: z_far,
+        },
+        normal_dirrection: Vec3 {
+            x: 0.0,
+            y: 0.0,
+            z: -1.0,
+        },
+    };
+    planes.push(far_plane);
+    planes
 }
 
 pub fn generate_box() -> Entity {

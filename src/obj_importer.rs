@@ -1,7 +1,7 @@
 use crate::types::{
-    get_vec3_identity, Entity, IntVec3, Mesh, Texture, TextureUV, Triangle, Vec2, Vec3,
+    get_vec3_identity, Entity, Mesh, Texture, TextureUV, Triangle, Vec3,
 };
-use image::{GenericImageView, Pixel};
+use image::GenericImageView;
 use native_dialog::FileDialog;
 use std::fs::File;
 use std::io::{BufRead, BufReader};

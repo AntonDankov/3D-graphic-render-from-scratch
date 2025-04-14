@@ -8,7 +8,6 @@ mod texture;
 mod types;
 mod vector;
 
-use std::thread;
 use std::time::Duration;
 
 use game_state::{get_game_memory, init_game_memory};
@@ -45,7 +44,7 @@ fn main() -> Result<(), String> {
     let mut frame_count = 0;
     let mut fps_timer = timer_subsystem.performance_counter();
     let mut previous_frame_time = timer_subsystem.performance_counter();
-    while (is_loop_running) {
+    while is_loop_running {
         let frame_start = timer_subsystem.performance_counter();
 
         get_game_memory().delta_time =
