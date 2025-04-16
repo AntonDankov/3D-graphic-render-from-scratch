@@ -74,35 +74,37 @@ pub struct Plane {
     pub normal_dirrection: Vec3,
 }
 
-pub struct CullinSettings {
-    pub planes: Vec<Plane>,
-    pub z_near: f32,
-    pub z_far: f32,
-}
-
-pub struct Memory {
-    pub delta_time: f32,
-    pub color_buffer: Vec<u32>,
-    // pub entity: Vec<Vec3>,
-    pub entity: Entity,
-    pub projected_points: Vec<Vec2>,
-    pub camera: Camera,
-    pub rotation_objects_type: u32,
-    pub speed: f32,
-    pub stop: bool,
+pub struct RenderSettings {
     pub show_normals: bool,
     pub fill_triangles: bool,
     pub use_textures: bool,
     pub draw_vert: bool,
     pub draw_edges: bool,
+    pub use_lighting: bool,
+    pub default_render_color: u32,
+}
+pub struct ViewSettings {
+    pub planes: Vec<Plane>,
+    pub z_near: f32,
+    pub z_far: f32,
     pub fov: Vec2,
+    pub width: u32,
+    pub height: u32,
+}
+
+pub struct Memory {
+    pub delta_time: f32,
+    pub color_buffer: Vec<u32>,
+    pub entity: Entity,
+    pub camera: Camera,
+    pub rotation_objects_type: u32,
+    pub speed: f32,
+    pub stop: bool,
+    pub render_settings: RenderSettings,
     pub light: Vec3,
     pub texture: Texture,
     pub z_buffer: Vec<f32>,
-    pub culling_settings: CullinSettings,
-    // pub texture: Vec<u32>,
-    // pub window_width: i32,
-    // pub window_height: i32,
+    pub view_settings: ViewSettings,
 }
 
 #[derive(Clone, Copy)]
@@ -134,7 +136,6 @@ pub struct Entity {
     pub rotation: Vec3,
     pub scale: Vec3,
     pub translation: Vec3,
-    // pub projected_points: Vec<Vec3>,
 }
 
 pub struct Triangle {
@@ -148,12 +149,5 @@ pub struct Triangle {
 
 pub struct Mesh {
     pub vertices: Vec<Vec3>,
-    // pub indexes: Vec<IntVec3>,
-    // pub indexes: Vec<IntVec3>,
-    // pub texture_uv: Vec<TextureUV>,
     pub triangles: Vec<Triangle>,
-}
-
-pub struct Polygon {
-    pub verticies: Vec<Vec3>,
 }

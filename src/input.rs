@@ -32,7 +32,7 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
                 keycode: Some(Keycode::W),
                 ..
             } => {
-                let velocity = vector3_mul_float(memory.camera.direction, 0.05);
+                let velocity = vector3_mul_float(memory.camera.direction, 0.09);
 
                 get_game_memory().camera.position = vector3_add(memory.camera.position, velocity);
             }
@@ -40,18 +40,18 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
                 keycode: Some(Keycode::S),
                 ..
             } => {
-                let velocity = vector3_mul_float(memory.camera.direction, 0.05);
+                let velocity = vector3_mul_float(memory.camera.direction, 0.09);
 
                 get_game_memory().camera.position = vector3_sub(memory.camera.position, velocity);
             }
             Event::KeyDown {
                 keycode: Some(Keycode::A),
                 ..
-            } => get_game_memory().camera.velocity.x -= 0.01,
+            } => get_game_memory().camera.velocity.x -= 0.05,
             Event::KeyDown {
                 keycode: Some(Keycode::D),
                 ..
-            } => get_game_memory().camera.velocity.x += 0.01,
+            } => get_game_memory().camera.velocity.x += 0.05,
             Event::KeyDown {
                 keycode: Some(Keycode::F),
                 ..
@@ -83,27 +83,37 @@ pub fn process_input(event_pump: &mut sdl2::EventPump, is_loop_running: &mut boo
             Event::KeyDown {
                 keycode: Some(Keycode::Z),
                 ..
-            } => get_game_memory().stop = !get_game_memory().stop,
+            } => memory.stop = !memory.stop,
             Event::KeyDown {
                 keycode: Some(Keycode::Num1),
                 ..
-            } => get_game_memory().fill_triangles = !get_game_memory().fill_triangles,
+            } => memory.render_settings.fill_triangles = !memory.render_settings.fill_triangles,
             Event::KeyDown {
                 keycode: Some(Keycode::Num2),
                 ..
-            } => get_game_memory().draw_vert = !get_game_memory().draw_vert,
+            } => memory.render_settings.draw_vert = !memory.render_settings.draw_vert,
             Event::KeyDown {
                 keycode: Some(Keycode::Num3),
                 ..
-            } => get_game_memory().draw_edges = !get_game_memory().draw_edges,
+            } => memory.render_settings.draw_edges = !memory.render_settings.draw_edges,
             Event::KeyDown {
                 keycode: Some(Keycode::Num4),
                 ..
-            } => get_game_memory().show_normals = !get_game_memory().show_normals,
+            } => memory.render_settings.show_normals = !memory.render_settings.show_normals,
             Event::KeyDown {
                 keycode: Some(Keycode::Num5),
                 ..
-            } => get_game_memory().use_textures = !get_game_memory().use_textures,
+            } => memory.render_settings.use_textures = !memory.render_settings.use_textures,
+            Event::KeyDown {
+                keycode: Some(Keycode::Num6),
+                ..
+            } => memory.render_settings.use_lighting = !memory.render_settings.use_lighting,
+            Event::MouseMotion {
+                x, xrel, y, yrel, ..
+            } => {
+                memory.camera.rotation.x += (yrel as f32) * 0.001;
+                memory.camera.rotation.y += (xrel as f32) * 0.001;
+            }
             Event::KeyDown {
                 keycode: Some(Keycode::O),
                 ..

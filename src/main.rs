@@ -4,6 +4,7 @@ mod math;
 mod matrix;
 mod obj_importer;
 mod render;
+mod subpixel_rendering;
 mod texture;
 mod types;
 mod vector;
@@ -18,14 +19,17 @@ use render::render;
 fn main() -> Result<(), String> {
     init_game_memory();
     let sdl_context = sdl2::init()?;
+
     let width = 1270;
     let height = 720;
     let video_subsystem = sdl_context.video()?;
-    let window = video_subsystem
+    let mut window = video_subsystem
         .window("3D from scratch pukima course", width, height)
         .position_centered()
         .build()
         .map_err(|e| e.to_string())?;
+    sdl_context.mouse().set_relative_mouse_mode(true);
+    sdl_context.mouse().show_cursor(false);
     let mut canvas = window.into_canvas().build().map_err(|e| e.to_string())?;
     let texture_creator = canvas.texture_creator();
     let mut is_loop_running = true;

@@ -1,6 +1,4 @@
-use crate::types::{
-    get_vec3_identity, Entity, Mesh, Texture, TextureUV, Triangle, Vec3,
-};
+use crate::types::{get_vec3_identity, Entity, Mesh, Texture, TextureUV, Triangle, Vec3};
 use image::GenericImageView;
 use native_dialog::FileDialog;
 use std::fs::File;
@@ -126,14 +124,12 @@ pub fn import_texture(path: &str) -> Texture {
 
     let mut data = Vec::with_capacity((width * height) as usize);
     let rgba = image.to_rgba8();
-    let mut counter = 0;
     dbg!(width, height);
     for pixel in rgba.pixels() {
         let r = pixel[0] as u32;
         let g = pixel[1] as u32;
         let b = pixel[2] as u32;
         let a = pixel[3] as u32;
-        counter += 1;
 
         let argb = (a << 24) | (r << 16) | (g << 8) | b;
         data.push(argb);

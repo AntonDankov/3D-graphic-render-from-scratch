@@ -4,7 +4,7 @@ use crate::matrix::{
     get_matrix4_translation, matrix4_mul_vec4, Matrix4,
 };
 use crate::types::{IntVec2, TextureUV, Vec2, Vec3};
-use crate::vector::Vec4;
+use crate::vector::{FixedVec4, Vec4};
 // pub fn ortographic_project_entity() {
 //     let memory = get_game_memory();
 //     for i in 0..BOX_POINT_COUNTER {
@@ -16,7 +16,6 @@ use crate::vector::Vec4;
 
 pub fn perspective_project_point(
     point: Vec3,
-    camera: Vec3,
     projection_matrix: Matrix4,
     window_height: u32,
     window_width: u32,
@@ -24,10 +23,6 @@ pub fn perspective_project_point(
     let normalized = matrix4_mul_vec4(projection_matrix, point.into());
 
     let mut projected = Vec4 {
-        // x: (point.x - camera.x) * FOV_FACTOR / (point.z - camera.z) + (WIDTH / 2) as f32,
-        // y: (point.y - camera.y) * FOV_FACTOR / (point.z - camera.z) + (HEIGHT / 2) as f32,
-        // x: (point.x) * FOV_FACTOR / point.z + (WIDTH / 2) as f32,
-        // y: (point.y) * FOV_FACTOR / point.z + (HEIGHT / 2) as f32,
         x: normalized.x,
         y: normalized.y,
         z: normalized.z,
@@ -49,19 +44,6 @@ pub fn perspective_project_point(
     projected
 }
 
-// pub fn perspective_project_entity() {
-//     let memory = get_game_memory();
-//     for i in 0..BOX_POINT_COUNTER {
-//         let point = memory.entity[i];
-//         memory.projected_points[i].x =
-//             (point.x / (point.z - memory.camera_position.z)) * FOV_FACTOR + (WIDTH / 2) as f32;
-//
-//         memory.projected_points[i].y =
-//             (point.y / (point.z - memory.camera_position.z)) * FOV_FACTOR + (HEIGHT / 2) as f32;
-//     }
-// }
-//
-//
 pub fn barycentric_weights(a: IntVec2, b: IntVec2, c: IntVec2, p: IntVec2) -> Vec3 {
     let ac = intvector2_sub(c, a);
     let ab = intvector2_sub(b, a);
@@ -116,7 +98,7 @@ pub fn transform_vertex(
 
 pub fn rotate_entity() {
     let memory = get_game_memory();
-    for i in 0..memory.entity.mesh.vertices.len() {
+    for _i in 0..memory.entity.mesh.vertices.len() {
         if memory.rotation_objects_type == 0 {
             memory.entity.rotation.x += memory.speed * memory.delta_time;
             // memory.entity.scale.x += memory.speed;
@@ -177,10 +159,8 @@ pub fn triangle_midpoint_uv(
     uv1: TextureUV,
     uv2: TextureUV,
 ) -> TextureUV {
-    // Get the midpoint in screen space
     let mid_point = triangle_vec4_midpoint(p0, p1, p2);
 
-    // Calculate barycentric weights for this point
     let weights = barycentric_weights(p0.into(), p1.into(), p2.into(), mid_point.into());
 
     let alpha = weights.x;
@@ -189,7 +169,6 @@ pub fn triangle_midpoint_uv(
 
     let interpolated_reciprocal_w = 1.0 / p0.w * alpha + 1.0 / p1.w * beta + 1.0 / p2.w * gamma;
 
-    // Interpolate texture coordinates using barycentric weights
     let mut texture = TextureUV {
         u: uv0.u * alpha / p0.w + uv1.u / p1.w * beta + uv2.u / p2.w * weights.z,
         v: uv0.v / p0.w * weights.x + uv1.v / p1.w * weights.y + uv2.v / p2.w * weights.z,
@@ -199,6 +178,7 @@ pub fn triangle_midpoint_uv(
     texture
 }
 
+#[allow(dead_code)]
 pub fn rotate_vec3_x(vec: Vec3, angle: f32) -> Vec3 {
     let mut res = Vec3::default();
     res.x = vec.x;
@@ -207,6 +187,7 @@ pub fn rotate_vec3_x(vec: Vec3, angle: f32) -> Vec3 {
     res
 }
 
+#[allow(dead_code)]
 pub fn rotate_vec3_y(vec: Vec3, angle: f32) -> Vec3 {
     let mut res = Vec3::default();
     res.x = vec.x * angle.cos() - vec.z * angle.sin();
@@ -215,6 +196,7 @@ pub fn rotate_vec3_y(vec: Vec3, angle: f32) -> Vec3 {
     res
 }
 
+#[allow(dead_code)]
 pub fn rotate_vec3_z(vec: Vec3, angle: f32) -> Vec3 {
     let mut res = Vec3::default();
     res.x = vec.x * angle.cos() - vec.y * angle.sin();
@@ -238,12 +220,12 @@ pub fn triangle_avg(vec1: Vec3, vec2: Vec3, vec3: Vec3) -> Vec3 {
     );
     res
 }
-
+#[allow(dead_code)]
 pub fn vector3_length(vec: Vec3) -> f32 {
     let length = (vec.x * vec.x + vec.y * vec.y + vec.z * vec.z).sqrt();
     length
 }
-
+#[allow(dead_code)]
 pub fn vector2_length(vec: Vec2) -> f32 {
     let length = (vec.x * vec.x + vec.y * vec.y).sqrt();
     length
@@ -314,7 +296,7 @@ pub fn vector2_mul_float(a: Vec2, b: f32) -> Vec2 {
     };
     res
 }
-
+#[allow(dead_code)]
 pub fn vector2_mul(a: Vec2, b: Vec2) -> Vec2 {
     let res = Vec2 {
         x: a.x * b.x,
@@ -331,7 +313,7 @@ pub fn vector3_div(a: Vec3, b: Vec3) -> Vec3 {
     };
     res
 }
-
+#[allow(dead_code)]
 pub fn vector2_div(a: Vec2, b: Vec2) -> Vec2 {
     let res = Vec2 {
         x: a.x / b.x,
@@ -358,7 +340,7 @@ pub fn vector3_dot(a: Vec3, b: Vec3) -> f32 {
     let dot = (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
     dot
 }
-
+#[allow(dead_code)]
 pub fn vector2_dot(a: Vec2, b: Vec2) -> f32 {
     let dot = a.x * b.x + a.y * b.y;
     dot

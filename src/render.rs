@@ -1,5 +1,5 @@
 use crate::types::{Camera, Entity, IntVec2, Plane, Texture, TextureUV, Vec2, Vec3};
-use crate::vector::Vec4;
+use crate::vector::{vector4_trunk, Vec4};
 use std::cmp;
 use std::thread;
 
@@ -10,19 +10,18 @@ use crate::math::{
     triangle_vec4_midpoint, vector2_add, vector2_mul_float, vector2_sub, vector3_add,
     vector3_cross, vector3_dot, vector3_mul, vector3_mul_float, vector3_normalize, vector3_sub,
 };
-use crate::matrix::{get_fps_view_matrix, get_projection_matrix, matrix4_mul_matrix4, Matrix4};
+use crate::matrix::{get_fps_view_matrix, get_projection_matrix, Matrix4};
+
+use crate::subpixel_rendering::subpixel_render_triangle;
 
 pub fn render_entity(entity: &Entity, camera: &mut Camera) {
     let line_color = 0xFF00FF00;
     let game_memory = get_game_memory();
-    // dbg!(
-    //     game_memory.entity.rotation.x,
-    //     game_memory.entity.rotation.y,
-    //     game_memory.entity.rotation.z
-    // );
 
-    let mut projection_matrix =
-        get_projection_matrix(game_memory.fov.y, HEIGHT as f32 / WIDTH as f32);
+    let projection_matrix = get_projection_matrix(
+        game_memory.view_settings.fov.y,
+        HEIGHT as f32 / WIDTH as f32,
+    );
     /*  Look-At method of view with locking on the target
     let view_matrix = get_look_at_view_matrix(
         camera.position,
@@ -37,11 +36,8 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
             z: 0.0,
         },
     ); */
-    // dbg!("loop render");
     let view_matrix = get_fps_view_matrix(&mut game_memory.camera);
-    // projection_matrix = matrix4_mul_matrix4(projection_matrix, view_matrix);
     for (i, triangle) in entity.mesh.triangles.iter().enumerate() {
-        // dbg!(i);
         let x_index = (triangle.a as usize) - 1;
         let y_index = (triangle.b as usize) - 1;
         let z_index = (triangle.c as usize) - 1;
@@ -81,7 +77,7 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
         let normal_avg = triangle_avg(p0, p1, p2);
 
         let (clipped_triangles, clipped_triangle_uvs) = clip_triangle(
-            &game_memory.culling_settings.planes,
+            &game_memory.view_settings.planes,
             p0,
             p1,
             p2,
@@ -93,59 +89,67 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
             let clipped_triangle = &clipped_triangles[j];
 
             let clipped_triangle_uv = &clipped_triangle_uvs[j];
-            let projected0 = perspective_project_point(
-                clipped_triangle[0],
-                // p0,
-                camera.position,
-                projection_matrix,
-                HEIGHT,
-                WIDTH,
-            );
-            let projected1 = perspective_project_point(
-                clipped_triangle[1],
-                // p1,
-                camera.position,
-                projection_matrix,
-                HEIGHT,
-                WIDTH,
-            );
-            let projected2 = perspective_project_point(
-                clipped_triangle[2],
-                // p2,
-                camera.position,
-                projection_matrix,
-                HEIGHT,
-                WIDTH,
-            );
+            let projected0 =
+                perspective_project_point(clipped_triangle[0], projection_matrix, HEIGHT, WIDTH);
+            let projected1 =
+                perspective_project_point(clipped_triangle[1], projection_matrix, HEIGHT, WIDTH);
+            let projected2 =
+                perspective_project_point(clipped_triangle[2], projection_matrix, HEIGHT, WIDTH);
 
-            if get_game_memory().fill_triangles {
-                let light_dot = vector3_dot(game_memory.light, normal) * -1.0;
-                let color_by_light = light_apply_intensity(0xFF184787, light_dot);
-                if game_memory.use_textures {
+            if game_memory.render_settings.fill_triangles {
+                if game_memory.render_settings.use_textures {
                     let texture_uv0 = clipped_triangle_uv[0].clone();
                     let texture_uv1 = clipped_triangle_uv[1].clone();
                     let texture_uv2 = clipped_triangle_uv[2].clone();
-
-                    fill_triangle_with_texture(
-                        projected0,
-                        projected1,
-                        projected2,
-                        texture_uv0,
-                        texture_uv1,
-                        texture_uv2,
-                        &game_memory.texture,
-                    );
+                    if game_memory.render_settings.use_lighting {
+                        let light_dot = vector3_dot(game_memory.light, normal) * -1.0;
+                        fill_triangle_with_texture(
+                            vector4_trunk(projected0),
+                            vector4_trunk(projected1),
+                            vector4_trunk(projected2),
+                            texture_uv0,
+                            texture_uv1,
+                            texture_uv2,
+                            &game_memory.texture,
+                        );
+                    } else {
+                        fill_triangle_with_texture(
+                            vector4_trunk(projected0),
+                            vector4_trunk(projected1),
+                            vector4_trunk(projected2),
+                            texture_uv0,
+                            texture_uv1,
+                            texture_uv2,
+                            &game_memory.texture,
+                        );
+                    }
                 } else {
-                    fill_triangle(
+                    let light_dot = vector3_dot(game_memory.light, normal) * -1.0;
+                    let mut color_by_light = game_memory.render_settings.default_render_color;
+                    if game_memory.render_settings.use_lighting {
+                        color_by_light = light_apply_intensity(color_by_light, light_dot);
+                    }
+                    subpixel_render_triangle(
                         projected0.into(),
                         projected1.into(),
                         projected2.into(),
+                        &clipped_triangle_uv[0],
+                        &clipped_triangle_uv[1],
+                        &clipped_triangle_uv[2],
+                        &game_memory.texture,
                         color_by_light,
+                        light_dot,
                     );
+                    // fill_triangle(
+                    //     projected0.into(),
+                    //     projected1.into(),
+                    //     projected2.into(),
+                    //     color_by_light,
+                    // );
                 }
             }
 
-            if game_memory.draw_edges {
+            if game_memory.render_settings.draw_edges {
                 render_edges(
                     projected0.into(),
                     projected1.into(),
@@ -154,12 +158,12 @@ pub fn render_entity(entity: &Entity, camera: &mut Camera) {
                 );
             }
 
-            if game_memory.draw_vert {
+            if game_memory.render_settings.draw_vert {
                 render_verticies(projected0.into(), projected1.into(), projected2.into());
             }
 
-            if game_memory.show_normals {
-                render_normals(normal, normal_avg, camera.position, projection_matrix);
+            if game_memory.render_settings.show_normals {
+                render_normals(normal, normal_avg, projection_matrix);
             }
         }
     }
@@ -208,7 +212,7 @@ pub fn clip_triangle(
         trinagles_uv.push(triangle_uv);
 
         i += 1;
-        if (i >= polygon_points.len()) {
+        if i >= polygon_points.len() {
             break;
         }
     }
@@ -235,8 +239,7 @@ pub fn clip_polygon(
         let uv = polygon_uvs[i];
         let sp = vector3_sub(point, plane.position);
         let dot = vector3_dot(sp, plane.normal_dirrection);
-        // dbg!(dot, previous_dot);
-        if (dot * previous_dot < 0.0) {
+        if dot * previous_dot < 0.0 {
             let t = (previous_dot) / (previous_dot - dot);
             let intersect_point = vector3_add(
                 prev_point,
@@ -252,7 +255,7 @@ pub fn clip_polygon(
             inside_uvs.push(intersect_uv);
         }
 
-        if (dot > 0.0) {
+        if dot > 0.0 {
             inside_points.push(point);
             inside_uvs.push(uv);
         }
@@ -293,7 +296,7 @@ pub fn render_edges(p0: Vec2, p1: Vec2, p2: Vec2, line_color: u32) {
     );
 }
 
-pub fn render_normals(normal: Vec3, normal_avg: Vec3, camera: Vec3, projection_matrix: Matrix4) {
+pub fn render_normals(normal: Vec3, normal_avg: Vec3, projection_matrix: Matrix4) {
     let normal_end = vector3_add(
         normal_avg,
         vector3_mul(
@@ -306,9 +309,9 @@ pub fn render_normals(normal: Vec3, normal_avg: Vec3, camera: Vec3, projection_m
         ),
     );
     let projected_normal_start =
-        perspective_project_point(normal_avg, camera, projection_matrix, HEIGHT, WIDTH);
+        perspective_project_point(normal_avg, projection_matrix, HEIGHT, WIDTH);
     let projected_normal_end =
-        perspective_project_point(normal_end, camera, projection_matrix, HEIGHT, WIDTH);
+        perspective_project_point(normal_end, projection_matrix, HEIGHT, WIDTH);
 
     render_line(
         projected_normal_start.x as i32,
@@ -320,9 +323,6 @@ pub fn render_normals(normal: Vec3, normal_avg: Vec3, camera: Vec3, projection_m
 }
 
 pub fn render_line(x_start: i32, y_start: i32, x_end: i32, y_end: i32, color: u32) {
-    let width_i32 = WIDTH as i32;
-    let height_i32 = HEIGHT as i32;
-
     let x_start_cheched = x_start;
 
     let x_end_cheched = x_end;
@@ -341,7 +341,7 @@ pub fn render_line(x_start: i32, y_start: i32, x_end: i32, y_end: i32, color: u3
     let mut x_cur = x_start_cheched as f32;
     let mut y_cur = y_start as f32;
 
-    for i in 0..side_length + 1 {
+    for _i in 0..side_length + 1 {
         render_pixel(x_cur.trunc() as i32, y_cur.trunc() as i32, color);
         x_cur += x_inc;
         y_cur += y_inc;
@@ -349,8 +349,6 @@ pub fn render_line(x_start: i32, y_start: i32, x_end: i32, y_end: i32, color: u3
 }
 
 pub fn render_box(x_pos: i32, y_pos: i32, box_width: u32, box_height: u32, color: u32) {
-    let width_i32 = WIDTH as i32;
-    let height_i32 = HEIGHT as i32;
     let box_width_i32 = box_width as i32;
     let box_height_i32 = box_height as i32;
     let x_begin = cmp::max(0, x_pos);
@@ -691,6 +689,7 @@ pub fn render_pixel(x_pos: i32, y_pos: i32, color: u32) {
     }
 }
 
+#[allow(dead_code)]
 pub fn clear_color_buffer(color: u32) {
     let color_buffer = get_color_buffer();
     for y in 0..HEIGHT {
@@ -705,7 +704,7 @@ pub fn render_color_buffer(
     texture: &mut sdl2::render::Texture,
 ) -> Result<(), String> {
     let color_buffer = get_color_buffer();
-    texture.update(
+    let _ = texture.update(
         None,
         unsafe {
             std::slice::from_raw_parts(color_buffer.as_ptr() as *const u8, color_buffer.len() * 4)
@@ -733,7 +732,7 @@ pub fn make_grid(color_line: u32, color_back: u32, width: u32, height: u32) {
             let start_row = thread_id * rows_per_thread;
             let end_row = std::cmp::min((thread_id + 1) * rows_per_thread, HEIGHT as usize);
 
-            s.spawn(move || unsafe {
+            s.spawn(move || {
                 let buffer = get_color_buffer();
 
                 for y in start_row..end_row {
@@ -759,7 +758,7 @@ pub fn render(
     color_buffer: &mut [u32],
     width: u32,
     height: u32,
-) -> Result<(), String> {
+) {
     let memory = get_game_memory();
 
     // canvas.set_draw_color(Color::RGB(0, 0, 0));
@@ -767,12 +766,8 @@ pub fn render(
     // clear_color_buffer(0xFFFF0000);
     make_grid(0xFF505966, 0xFF292B2E, width, height);
     render_entity(&memory.entity, &mut memory.camera);
-    // render_box(100, 100, 200, 200, 0xFFEDAB74);
-    // render_box(-100, -100, 200, 200, 0xFFEDAB74);
-    // render_pixel((width / 2) as i32, (height / 2) as i32, 0xFFED0010);
-    render_color_buffer(canvas, texture);
+    let _ = render_color_buffer(canvas, texture);
     for i in 0..memory.z_buffer.len() {
         memory.z_buffer[i] = 1.0;
     }
-    Ok(())
 }

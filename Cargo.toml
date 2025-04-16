@@ -7,3 +7,4 @@ edition = "2021"
 sdl2 = { version = "0.37", features = ["bundled"] }
 native-dialog = "0.7.0"
 image = "0.25.6" # Use the latest version
+fixed = "1.29"

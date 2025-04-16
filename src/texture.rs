@@ -2,9 +2,6 @@
 const TEXTURE_WIDTH: usize = 64;
 const TEXTURE_HEIGHT: usize = 64;
 
-// Optional: Create a texture reference that starts as None
-static mut MESH_TEXTURE: Option<&[u32]> = None;
-
 // Define the texture data as a static byte array
 pub static REDBRICK_TEXTURE: [u8; TEXTURE_WIDTH * TEXTURE_HEIGHT * 4] = [
     0x38, 0x38, 0x38, 0xff, 0x38, 0x38, 0x38, 0xff, 0x38, 0x38, 0x38, 0xff, 0x38, 0x38, 0x38, 0xff,

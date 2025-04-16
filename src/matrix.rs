@@ -13,6 +13,7 @@ impl Default for Matrix4 {
     }
 }
 
+#[allow(dead_code)]
 pub fn get_matrix4_identity() -> Matrix4 {
     Matrix4 {
         m: [
@@ -20,17 +21,6 @@ pub fn get_matrix4_identity() -> Matrix4 {
             [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
-        ],
-    }
-}
-
-pub fn get_matrix4_zero() -> Matrix4 {
-    Matrix4 {
-        m: [
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0],
         ],
     }
 }
@@ -109,8 +99,9 @@ pub fn get_matrix4_rotation_z(angle: f32) -> Matrix4 {
     }
 }
 
+#[allow(dead_code)]
 pub fn matrix4_mul_matrix4(matrix1: Matrix4, matrix2: Matrix4) -> Matrix4 {
-    let mut res = get_matrix4_zero();
+    let mut res = Matrix4::default();
     for i in 0..4 {
         for j in 0..4 {
             for k in 0..4 {
@@ -127,13 +118,16 @@ pub fn get_fps_view_matrix(camera: &mut Camera) -> Matrix4 {
         y: 0.0,
         z: 1.0,
     };
-    // vector3_add(target, camera.velocity);
+    let x_rotation_matrix = get_matrix4_rotation_x(camera.rotation.x);
     let y_rotation_matrix = get_matrix4_rotation_y(camera.rotation.y);
-    camera.direction = matrix4_mul_vec4(y_rotation_matrix, target.into()).into();
+    let mut rotation_matrix = matrix4_mul_matrix4(x_rotation_matrix, get_matrix4_identity());
+    rotation_matrix = matrix4_mul_matrix4(y_rotation_matrix, rotation_matrix);
+    camera.direction = matrix4_mul_vec4(rotation_matrix, target.into()).into();
     camera.position = vector3_add(
         camera.position,
         matrix4_mul_vec4(y_rotation_matrix, camera.velocity.into()).into(),
     );
+    camera.velocity = Vec3::default();
     target = vector3_add(camera.direction, camera.position);
 
     let view_matrix = get_look_at_view_matrix(
@@ -145,9 +139,6 @@ pub fn get_fps_view_matrix(camera: &mut Camera) -> Matrix4 {
             z: 0.0,
         },
     );
-    let tr = get_matrix4_translation(camera.velocity.x, camera.velocity.y, camera.velocity.z);
-    camera.velocity = Vec3::default();
-    // view_matrix = matrix4_mul_matrix4(view_matrix, tr);
     view_matrix
 }
 
@@ -171,17 +162,15 @@ pub fn get_look_at_view_matrix(camera_pos: Vec3, target: Vec3, up_view: Vec3) ->
 }
 
 pub fn get_projection_matrix(fov: f32, aspect_ratio: f32) -> Matrix4 {
-    // let f = (1.0 as f64 / ((fov as f32 / 2.0).tan()) as f64) as f32;
-    let f = 1.73205078;
-    let ff = (fov as f32 / 2.0).tan();
+    let field_of_view_scaling = 1.0 / (fov as f32 / 2.0).tan();
     let z_far = 100.0;
     let z_near = 0.1;
     let z_normalizer_left = z_far / (z_far - z_near);
     let z_normalizer_right = -(z_far / (z_far - z_near) * z_near);
     let res = Matrix4 {
         m: [
-            [aspect_ratio * f as f32, 0.0, 0.0, 0.0],
-            [0.0, f as f32, 0.0, 0.0],
+            [aspect_ratio * field_of_view_scaling as f32, 0.0, 0.0, 0.0],
+            [0.0, field_of_view_scaling as f32, 0.0, 0.0],
             [0.0, 0.0, z_normalizer_left, z_normalizer_right],
             [0.0, 0.0, 1.0, 0.0],
         ],

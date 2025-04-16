@@ -1,10 +1,9 @@
 use crate::texture::REDBRICK_TEXTURE;
 use crate::types::{
-    get_vec3_identity, Camera, CullinSettings, Entity, Memory, Mesh, Plane, Texture, TextureUV,
-    Triangle, Vec2, Vec3,
+    get_vec3_identity, Camera, Entity, Memory, Mesh, Plane, RenderSettings, Texture, TextureUV,
+    Triangle, Vec2, Vec3, ViewSettings,
 };
 
-pub static FOV_FACTOR: f32 = 640.0;
 pub static BOX_POINT_COUNTER: usize = 9 * 9 * 9;
 pub static WIDTH: u32 = 1280;
 pub static HEIGHT: u32 = 720;
@@ -13,26 +12,38 @@ pub static mut GAME_MEMORY: Option<Memory> = None;
 
 pub fn init_game_memory() {
     unsafe {
+        let render_settings = RenderSettings {
+            show_normals: false,
+            fill_triangles: true,
+            draw_vert: true,
+            draw_edges: true,
+            use_textures: false,
+            use_lighting: false,
+            default_render_color: 0xFF184787,
+        };
         let texture_u32: Vec<u32> = REDBRICK_TEXTURE
             .chunks_exact(4)
             .map(|chunk| u32::from_ne_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]))
             .collect();
-        let z_near = 0.01;
-        let z_far = 100.0;
         let fov_y: f32 = 3.14159265358979323846264338327950288 / 3.0;
-        let aspect_ration_x: f32 = WIDTH as f32 / HEIGHT as f32;
-        let fov = Vec2 {
-            x: ((fov_y / 2.0).tan() * aspect_ration_x).atan() * 2.0,
-            y: fov_y,
+        let aspect_ratio_x: f32 = WIDTH as f32 / HEIGHT as f32;
+        let mut view_settings = ViewSettings {
+            z_near: 0.01,
+            z_far: 100.0,
+            planes: vec![],
+            fov: Vec2 {
+                x: ((fov_y / 2.0).tan() * aspect_ratio_x).atan() * 2.0,
+                y: fov_y,
+            },
+            width: 1280,
+            height: 720,
         };
+        view_settings.planes =
+            generate_culling_planes(view_settings.fov, view_settings.z_near, view_settings.z_far);
         GAME_MEMORY = Some(Memory {
             delta_time: 0.0,
             color_buffer: vec![0; (WIDTH * HEIGHT) as usize],
             entity: generate_box(),
-            // entity: import_entity_from_obj(
-            //     "D:\\Coding\\Projects\\graphics_3d_from_scratch_pikuma\\assets\\cube.obj",
-            // ),
-            projected_points: vec![Vec2::default(); BOX_POINT_COUNTER],
             camera: Camera {
                 position: Vec3 {
                     x: 0.0,
@@ -46,12 +57,8 @@ pub fn init_game_memory() {
             rotation_objects_type: 0,
             speed: 0.000,
             stop: false,
-            show_normals: false,
-            fill_triangles: true,
-            draw_vert: true,
-            draw_edges: true,
-            use_textures: false,
-            fov: fov,
+            render_settings: render_settings,
+
             light: Vec3 {
                 x: 0.0,
                 y: 0.0,
@@ -63,11 +70,7 @@ pub fn init_game_memory() {
                 height: 64,
             },
             z_buffer: vec![1.0; (WIDTH * HEIGHT) as usize],
-            culling_settings: CullinSettings {
-                planes: generate_culling_planes(fov, z_near, z_far),
-                z_near: z_near,
-                z_far: z_far,
-            },
+            view_settings,
         });
     }
 }
